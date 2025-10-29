@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- 
+    Imports silksong path properties only if present in order to allow CI builds. The file should be gitignored.
+    If you are checking out from git and need to create a new one, you can use `dotnet new silksongpath` to generate one.
+    -->
+    <Import Condition="Exists('SilksongPath.props')" Project="SilksongPath.props"/>
+    <ItemGroup>
+        <Content Include="$(MSBuildProjectDirectory)/../Included Clips/**/*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Link>Clips/%(RecursiveDir)%(Filename)%(Extension)</Link>
+        </Content>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <RestoreAdditionalProjectSources>
+            https://nuget.bepinex.dev/v3/index.json
+        </RestoreAdditionalProjectSources>
+        <RestorePackagesWithLockFile>True</RestorePackagesWithLockFile>
+        <!--Allow access of private members at runtime.-->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <!--Shortens and anonymizes paths in debug symbols relative to the project directory. Breakpoints will not work, however.-->
+        <PathMap Condition="'$(Configuration)' == 'Release'">$(MSBuildProjectDirectory)=/</PathMap>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BepInEx.Analyzers" Version="1.0.8" PrivateAssets="all"/>
+        <PackageReference Include="BepInEx.Core" Version="5.4.21"/>
+        <PackageReference Include="Hamunii.BepInEx.AutoPlugin" Version="2.0.1" PrivateAssets="all"/>
+        <PackageReference Include="UnityEngine.Modules" Version="6000.0.50" IncludeAssets="compile"/>
+        <!--If you're unable resolve this dependency, check that you're using the nuget v3 package feed instead of v2.-->
+        <PackageReference Include="Silksong.GameLibs" Version="*-*" PrivateAssets="all"/>
+    </ItemGroup>
+
+    <Target Name="CopyMod" AfterTargets="PostBuildEvent">
+        <ItemGroup>
+            <Binaries Include="$(TargetPath)"/>
+            <Clips Include="$(TargetDir)Clips/**/*"/>
+        </ItemGroup>
+
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="$(SilksongFolder)/BepInEx/plugins/$(TargetName)"/>
+        <Copy SourceFiles="@(Clips)" DestinationFiles="@(Clips->'$(SilksongFolder)/BepInEx/plugins/$(TargetName)/Clips/%(RecursiveDir)%(Filename)%(Extension)')"/>
+
+        <PropertyGroup>
+            <ExportFolder>../Release</ExportFolder>
+        </PropertyGroup>
+
+        <RemoveDir Directories="$(IntermediateOutputPath)/archive"/>
+        <MakeDir Directories="$(ExportFolder)"/>
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="$(IntermediateOutputPath)/archive"/>
+        <Copy SourceFiles="@(Clips)" DestinationFiles="@(Clips->'$(IntermediateOutputPath)/archive/Clips/%(RecursiveDir)%(Filename)%(Extension)')"/>
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="$(ExportFolder)"/>
+        <ZipDirectory SourceDirectory="$(IntermediateOutputPath)/archive" DestinationFile="$(ExportFolder)/$(TargetName).zip" Overwrite="True"/>
+    </Target>
+</Project>
