@@ -1,7 +1,7 @@
 A Silksong mod that enables users to customize random audio with their own .wav audio clips. The mod comes prepackaged with some of Hornet's voice lines from the original Hollow Knight game (including shaw).
 <br><br>
 
-https://github.com/user-attachments/assets/6417d91a-ac40-4577-a875-26994b1873fd
+https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 
 # Guide
 ---
