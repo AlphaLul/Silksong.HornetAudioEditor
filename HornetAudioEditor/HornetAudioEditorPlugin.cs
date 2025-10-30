@@ -39,24 +39,22 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             "General",
             "Enabled",
             true,
-            "Whether or not to execute the mod. Set to false to disable the mod.");
+            "Whether the mod is active. Set to false to disable the mod.");
         configLogAudio = Config.Bind(
             "General",
             "LogAudio",
             false,
-            "Whether or not to log the name of a RandomAudioClipTable whenever it plays a sound. " + 
-            "Useful for finding the names of audio tables.");
+            "Whether to log the name of a RandomAudioClipTable when it plays a sound. Useful for finding table names.");
         configRefreshOnSaveQuit = Config.Bind(
             "Loading",
             "RefreshOnSaveQuit",
             true,
-            "Whether or not to refresh the mod after returning to the title screen.");
+            "Whether to refresh the mod after returning to the title screen.");
         configRefreshHotkey = Config.Bind(
             "Loading",
             "RefreshHotkey",
             KeyCode.None,
-            "An optional hotkey to refresh the mod any time in-game. " +
-            "Can be used to load RandomAudioClipTables that aren't available on launch when pressed.");
+            "Optional hotkey to refresh the mod at any time. Use to load tables unavailable at launch.");
 
         if (!configModEnabled.Value) return;
         
