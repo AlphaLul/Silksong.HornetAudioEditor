@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HornetAudioEditor", "HornetAudioEditor\HornetAudioEditor.csproj", "{3F89C9CE-882E-4501-974E-B313AB43FADB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioTablePatcher", "AudioTablePatcher\AudioTablePatcher.csproj", "{CA89F77E-127B-44F4-9010-737878681EB9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{3F89C9CE-882E-4501-974E-B313AB43FADB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F89C9CE-882E-4501-974E-B313AB43FADB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3F89C9CE-882E-4501-974E-B313AB43FADB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA89F77E-127B-44F4-9010-737878681EB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA89F77E-127B-44F4-9010-737878681EB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA89F77E-127B-44F4-9010-737878681EB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA89F77E-127B-44F4-9010-737878681EB9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
