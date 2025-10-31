@@ -14,22 +14,20 @@ using ProbabilityAudioClip = RandomAudioClipTable.ProbabilityAudioClip;
 namespace HornetAudioEditor;
 #nullable disable
 
-[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.0.0")]
+[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.1.0")]
 public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 {
-    private AudioCollectionsData audioCollectionsData;
     private Dictionary<string, List<ProbabilityAudioClip>> folderClips;
     private Dictionary<string, AudioCollection> audioCollections;
     private string audioCollectionsPath;
 
-    public static HornetAudioEditorPlugin Instance { get; private set; }
+    private static HornetAudioEditorPlugin Instance { get; set; }
     private Harmony harmony = new(Id);
     
     private string clipsPath;
     private ConfigEntry<bool> configModEnabled;
     private ConfigEntry<bool> configLogAudio;
     private ConfigEntry<bool> configRefreshOnSaveQuit;
-    private ConfigEntry<KeyCode> configRefreshHotkey;
     
     private void Awake()
     {
@@ -49,12 +47,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             "Loading",
             "RefreshOnSaveQuit",
             true,
-            "Whether to refresh the mod after returning to the title screen.");
-        configRefreshHotkey = Config.Bind(
-            "Loading",
-            "RefreshHotkey",
-            KeyCode.None,
-            "Optional hotkey to refresh the mod at any time. Use to load tables unavailable at launch.");
+            "Whether to re-apply audioCollections.json upon returning to the title screen.");
 
         if (!configModEnabled.Value) return;
         
@@ -63,58 +56,29 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         Directory.CreateDirectory(clipsPath);
         
         harmony.PatchAll(typeof(GameManagerStart_Patch));
+        if (configRefreshOnSaveQuit.Value)
+            harmony.PatchAll(typeof(AudioTableOnEnable_Patch));
         if (configLogAudio.Value)
             harmony.PatchAll(typeof(AudioLog_Patch));
+
+        StartCoroutine(RefreshAudioCollectionsRoutine());
     }
 
-    private void Update()
+    private IEnumerator RefreshAudioCollectionsRoutine()
     {
-        if (configRefreshHotkey.Value != KeyCode.None && Input.GetKeyDown(configRefreshHotkey.Value))
+        if (!RetrieveAudioCollectionsData(audioCollectionsPath))
         {
-            ExecuteHornetAudioEditor();
-        }
-    }
-
-    public void ExecuteHornetAudioEditor()
-    {
-        if (!configModEnabled.Value) return;
-        if (audioCollectionsData != null && !configRefreshOnSaveQuit.Value) return;
-        StartCoroutine(ExecuteHornetAudioEditorRoutine());
-    }
-
-    private IEnumerator ExecuteHornetAudioEditorRoutine()
-    {
-        ResetClips();
-        audioCollectionsData = AudioCollectionsData.RetrieveAudioCollectionsData(audioCollectionsPath);
-        folderClips = audioCollectionsData?.folderClips;
-        audioCollections = audioCollectionsData?.audioCollections;
-        
-        if (audioCollectionsData == null || folderClips == null || audioCollections == null)
-        {
-            Logger.LogError(
-                $"Something is wrong with \'audioCollections.json\', unable to initialize HornetAudioEditor mod.");
+            Logger.LogError("Something is wrong with \'audioCollections.json\', unable to initialize HornetAudioEditor mod.");
             yield break;
         }
-        foreach (string subfolder in folderClips.Keys)
-        {
-            if (Directory.Exists(Path.Combine(clipsPath, subfolder))) continue;
-            
-            Logger.LogWarning($"\'{subfolder}\' folder does not exist. Creating new folder");
-            Directory.CreateDirectory(Path.Combine(clipsPath, subfolder));
-        }
         
-        CacheTables();
         yield return LoadClipsRoutine();
-        ApplyClips();
-    }
-    
-    private void ResetClips()
-    {
-        if (audioCollections == null) return;
-        foreach (AudioCollection audioCollection in audioCollections.Values)
+
+        RandomAudioClipTable[] loadedAudioTables = Resources.FindObjectsOfTypeAll<RandomAudioClipTable>();
+        foreach (RandomAudioClipTable table in loadedAudioTables)
         {
-            if (audioCollection.vanillaClips.IsNullOrEmpty()) continue;
-            audioCollection.table.clips = audioCollection.vanillaClips;
+            if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) continue;
+            ApplyClips(table, audioCollection);
         }
     }
     
@@ -124,13 +88,9 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         {
             List<AudioClip> streamedFolderClips = new();
             string folderPath = Path.Combine(clipsPath, folder);
+            if (!Directory.Exists(folderPath)) yield break;
+            
             string[] collectionWavFiles = Directory.GetFiles(folderPath, "*.wav", SearchOption.TopDirectoryOnly);
-            
-            if (collectionWavFiles.Length == 0)
-            {
-                Logger.LogWarning($"No wav files found in \'Clips{(folder.Equals("") ? "" : "/")}{folder}\' folder");
-            }
-            
             foreach (string wavFile in collectionWavFiles)
                 yield return WavToAudioClipRoutine(wavFile, streamedFolderClips);
             
@@ -159,85 +119,42 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         clips.Add(streamedClip);
     }
 
-    private void CacheTables()
+    private void ApplyClips(RandomAudioClipTable table, AudioCollection audioCollection)
     {
-        IEnumerable<AssetBundle> assetBundles = AssetBundle.GetAllLoadedAssetBundles();
+        List<ProbabilityAudioClip> clipsToApply = new();
+        foreach (string folder in audioCollection.folders)
+        {
+            clipsToApply.AddRange(folderClips[folder]);
+        }
+        if (clipsToApply.Count != 0) Logger.LogInfo($"Applied mod to {table.name}");
+        if (audioCollection.includeVanillaClips || clipsToApply.Count == 0)
+            clipsToApply.AddRange(audioCollection.vanillaClips);
         
-        List<string> tablesToRemove = new();
-        foreach ((string tableName, AudioCollection audioCollection) in audioCollections)
-        {
-            audioCollection.table = FindAndLoadTable(tableName, assetBundles);
-            if (!audioCollection.table)
-            {
-                Logger.LogError($"Unable to find RandomAudioClipTable named \'{tableName}\'");
-                tablesToRemove.Add(tableName);
-                continue;
-            }
-            
-            audioCollection.vanillaClips = (ProbabilityAudioClip[])audioCollection.table.clips.Clone();
-        }
-        foreach (string tableName in tablesToRemove)
-        {
-            audioCollections.Remove(tableName);
-        }
-    }
-
-    private RandomAudioClipTable FindAndLoadTable(string tableName, IEnumerable<AssetBundle> assetBundles)
-    {
-        foreach (AssetBundle assetBundle in assetBundles)
-        {
-            string tablePath = assetBundle.GetAllAssetNames().FirstOrDefault(assetPath => Path.GetFileName(assetPath).Equals($"{tableName}.asset"));
-            if (tablePath == null) continue;
-            
-            RandomAudioClipTable table = assetBundle.LoadAsset<RandomAudioClipTable>(tablePath);
-            if (table) return table;
-        }
-
-        return null;
+        table.clips = clipsToApply.ToArray();
+        
     }
     
-    private void ApplyClips()
+    private void LoadAudioTable(RandomAudioClipTable table)
     {
-        foreach ((string tableName, AudioCollection audioCollection) in audioCollections)
-        {
-            List<ProbabilityAudioClip> clipsToApply = new();
-            foreach (string folder in audioCollection.folders)
-            {
-                clipsToApply.AddRange(folderClips[folder]);
-            }
-            if (clipsToApply.Count > 0)
-                Logger.LogInfo($"Applied {clipsToApply.Count} modded clips to \'{tableName}\'");
-
-            if (audioCollection.includeVanillaClips || clipsToApply.Count == 0)
-            {
-                clipsToApply.AddRange(audioCollection.vanillaClips);
-                Logger.LogInfo($"Applied {audioCollection.vanillaClips.Length} vanilla clips to \'{tableName}\'");
-            }
-            
-            audioCollection.table.clips = clipsToApply.ToArray();
-        }
+        if (audioCollections == null || folderClips == null) return;
+        if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) return;
+        audioCollection.vanillaClips = (ProbabilityAudioClip[])table.clips.Clone();
+        ApplyClips(table, audioCollection);
     }
-
-    public void LogAudio(string message)
-    {
-        Logger.LogWarning(message);
-    }
-}
-
-public class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
-{
-    public HashSet<string> folders = folders;
-    public RandomAudioClipTable table;
-    public ProbabilityAudioClip[] vanillaClips;
-    public bool includeVanillaClips = includeVanillaClips;
-}
-
-public class AudioCollectionsData
-{
-    public Dictionary<string, List<ProbabilityAudioClip>> folderClips;
-    public Dictionary<string, AudioCollection> audioCollections;
     
-    public static AudioCollectionsData RetrieveAudioCollectionsData(string filePath)
+    private void LogAudio(string message)
+    {
+        Logger.LogInfo(message);
+    }
+
+    private class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
+    {
+        public HashSet<string> folders = folders;
+        public ProbabilityAudioClip[] vanillaClips;
+        public bool includeVanillaClips = includeVanillaClips;
+    }
+
+    private bool RetrieveAudioCollectionsData(string filePath)
     {
         Dictionary<string, string[]> rawAudioCollectionsData;
         JsonSerializerSettings jsonSettings = new()
@@ -256,7 +173,7 @@ public class AudioCollectionsData
             catch (Exception exception)
             {
                 Debug.LogError($"Hornet Audio Editor: {exception.Message}");
-                return null;
+                return false;
             }
         }
         else
@@ -276,9 +193,10 @@ public class AudioCollectionsData
         File.WriteAllText(filePath, json);
         
         // Parse raw data into list of folders/clips and list of audio collections
-        Dictionary<string, List<ProbabilityAudioClip>> folderClips = rawAudioCollectionsData.ToDictionary(kvp => kvp.Key, 
-            kvp => new List<ProbabilityAudioClip>());
-        Dictionary<string, AudioCollection> audioCollections = new();
+        folderClips = rawAudioCollectionsData.ToDictionary(kvp => kvp.Key, 
+            _ => new List<ProbabilityAudioClip>());
+        audioCollections = new();
+            
         foreach ((string folderName, string[] tableNames) in rawAudioCollectionsData)
         {
             foreach (string tableName in tableNames)
@@ -297,27 +215,37 @@ public class AudioCollectionsData
                 }
             }
         }
-        
-        return new AudioCollectionsData {folderClips = folderClips, audioCollections = audioCollections};
-    }
-}
 
-[HarmonyPatch(typeof(GameManager), nameof(GameManager.Start))]
-class GameManagerStart_Patch
-{
-    [HarmonyPostfix]
-    static void Start_Postfix(GameManager __instance)
-    {
-        HornetAudioEditorPlugin.Instance.ExecuteHornetAudioEditor();
+        return true;
     }
-}
-
-[HarmonyPatch(typeof(RandomAudioClipTable), nameof(RandomAudioClipTable.SelectRandomClip))]
-class AudioLog_Patch
-{
-    [HarmonyPrefix]
-    static void SelectRandomClip_Prefix(RandomAudioClipTable __instance)
+    
+    [HarmonyPatch(typeof(RandomAudioClipTable), "OnEnable")]
+    class AudioTableOnEnable_Patch
     {
-        HornetAudioEditorPlugin.Instance.LogAudio(__instance.name);
+        [HarmonyPrefix]
+        static void OnEnable_Prefix(RandomAudioClipTable __instance)
+        {
+            Instance.LoadAudioTable(__instance);
+        }
+    }
+    
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.Start))]
+    class GameManagerStart_Patch
+    {
+        [HarmonyPostfix]
+        static void Start_Postfix()
+        {
+            Instance.StartCoroutine(Instance.RefreshAudioCollectionsRoutine());
+        }
+    }
+
+    [HarmonyPatch(typeof(RandomAudioClipTable), nameof(RandomAudioClipTable.SelectRandomClip))]
+    class AudioLog_Patch
+    {
+        [HarmonyPrefix]
+        static void SelectRandomClip_Prefix(RandomAudioClipTable __instance)
+        {
+            Instance.LogAudio(__instance.name);
+        }
     }
 }
