@@ -5,7 +5,7 @@ https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 
 # Guide
 
-**Preface:** This mod only allows you to customize audio that uses `RandomAudioClipTable` internally. Essentially any audio that has multiple, randomly selected clips use `RandomAudioClipTable`. Examples include Hornet's action voices, enemy voices, impact sounds, etc.
+**Preface:** This mod only allows you to customize audio that uses `RandomAudioClipTable` internally. Most audio that has multiple, randomly selected clips uses `RandomAudioClipTable`. To determine what audio is eligible, read the [BepInEx Config](#bepinex-config) section below.
 
 ---
 ## Installation
@@ -83,8 +83,8 @@ To use `LogAudio` properly, you need to enable the BepInEx console to read the l
 2. Find the `[Logging.Console]` section
 3. Set `Enabled = true`
 
-This makes a console window launch along with the game that displays logs. Now you'll see the name of any `RandomAudioClipTable` in the console whenever it plays a sound, allowing you to tell which name goes with which sounds.
+This launches a console window alongside the game that displays logs. Now, if you set `LogAudio` to `true`, you'll see the name of any `RandomAudioClipTable` in the console whenever it plays a sound, allowing you to tell which name goes with which sounds.
 
 ---
 ### ⚠️ Important note
-Mono .wav files seem to play quieter than stereo clips. If your clips are sounding quieter than expected, consider converting them to stereo.
+Mono channel .wav files seem to play quieter than stereo ones. If your clips are sounding quieter than expected, consider converting them to stereo in an audio editor like Audacity by re-exporting them with stereo selected in the export options.

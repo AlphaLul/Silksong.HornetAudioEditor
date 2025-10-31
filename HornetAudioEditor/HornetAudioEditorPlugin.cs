@@ -144,7 +144,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     
     private void LogAudio(string message)
     {
-        Logger.LogWarning(message);
+        Logger.LogInfo(message);
     }
 
     private class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
