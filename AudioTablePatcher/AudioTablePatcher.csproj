@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <Import Condition="Exists('../SilksongPath.props')" Project="../SilksongPath.props"/>
+
+    <PropertyGroup>
+        <OutputType>Library</OutputType>
+        <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+        <OutputPath>../Release/</OutputPath>
+        <RootNamespace>AudioTablePatcher</RootNamespace>
+        <DebugType>none</DebugType>
+        <AssemblyName>AudioTablePatcher</AssemblyName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="Mono.Cecil">
+            <HintPath>$(SilksongFolder)/BepInEx/core/Mono.Cecil.dll</HintPath>
+        </Reference>
+        <Reference Include="System"/>
+        <Reference Include="System.Core"/>
+        <Reference Include="mscorlib"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="AudioTableOnEnablePatcher.cs"/>
+    </ItemGroup>
+
+    <Target Name="CopyMod" AfterTargets="PostBuildEvent">
+        <ItemGroup>
+            <Binaries Include="$(TargetPath)"/>
+        </ItemGroup>
+
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="$(SilksongFolder)/BepInEx/patchers"/>
+    </Target>
+
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
+</Project>
