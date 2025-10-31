@@ -9,7 +9,7 @@ https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 
 ---
 ## Installation
-1. Install BepInEx 5 for to your Silksong folder
+1. Install BepInEx 5 for Silksong
 2. Download `HornetAudioEditor.zip` and extract it to the `BepInEx/plugins` folder
 4. Download `AudioTablePatcher.dll` and put it in the `BepInEx/patchers` folder
 5. Run the game
