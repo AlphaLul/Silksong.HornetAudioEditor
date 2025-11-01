@@ -14,17 +14,18 @@ using ProbabilityAudioClip = RandomAudioClipTable.ProbabilityAudioClip;
 namespace HornetAudioEditor;
 #nullable disable
 
-[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.1.0")]
+[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.2.0")]
 public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 {
     private Dictionary<string, List<ProbabilityAudioClip>> folderClips;
     private Dictionary<string, AudioCollection> audioCollections;
+    private string clipsPath;
     private string audioCollectionsPath;
+    private string collectionTemplatesPath;
 
     private static HornetAudioEditorPlugin Instance { get; set; }
     private Harmony harmony = new(Id);
     
-    private string clipsPath;
     private ConfigEntry<bool> configModEnabled;
     private ConfigEntry<bool> configLogAudio;
     private ConfigEntry<bool> configRefreshOnSaveQuit;
@@ -51,8 +52,9 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 
         if (!configModEnabled.Value) return;
         
-        audioCollectionsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "audioCollections.json");
         clipsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Clips");
+        audioCollectionsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "audioCollections.json");
+        collectionTemplatesPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Collection Templates");
         Directory.CreateDirectory(clipsPath);
         
         harmony.PatchAll(typeof(GameManagerStart_Patch));
@@ -66,7 +68,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 
     private IEnumerator RefreshAudioCollectionsRoutine()
     {
-        if (!RetrieveAudioCollectionsData(audioCollectionsPath))
+        if (!RetrieveAudioCollectionsData())
         {
             Logger.LogError("Something is wrong with \'audioCollections.json\', unable to initialize HornetAudioEditor mod.");
             yield break;
@@ -154,9 +156,9 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         public bool includeVanillaClips = includeVanillaClips;
     }
 
-    private bool RetrieveAudioCollectionsData(string filePath)
+    private bool RetrieveAudioCollectionsData()
     {
-        Dictionary<string, string[]> rawAudioCollectionsData;
+        Dictionary<string, List<string>> rawAudioCollectionsData;
         JsonSerializerSettings jsonSettings = new()
         {
             Formatting = Formatting.Indented,
@@ -164,11 +166,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             DefaultValueHandling = DefaultValueHandling.Ignore
         };
         
-        if (File.Exists(filePath))
+        if (File.Exists(audioCollectionsPath))
         {
             try
             {
-                rawAudioCollectionsData = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(filePath));
+                rawAudioCollectionsData = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(File.ReadAllText(audioCollectionsPath));
             }
             catch (Exception exception)
             {
@@ -178,7 +180,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         }
         else
         {
-            rawAudioCollectionsData = new Dictionary<string, string[]>
+            rawAudioCollectionsData = new Dictionary<string, List<string>>
             {
                 [""] = 
                 [
@@ -189,15 +191,33 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             };
         }
         
+        foreach (List<string> tablesList in rawAudioCollectionsData.Values)
+        {
+            IEnumerable<string> collectionTemplates = tablesList.Where(t => t.EndsWith(".json")).ToList();
+            foreach (string collectionTemplate in collectionTemplates)
+            {
+                try
+                {
+                    string[] tables = JsonConvert.DeserializeObject<string[]>(File.ReadAllText(Path.Combine(collectionTemplatesPath, collectionTemplate)));
+                    tablesList.AddRange(tables);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError($"Hornet Audio Editor: {exception.Message}");
+                }
+                tablesList.Remove(collectionTemplate);
+            }
+        }
+        
         string json = JsonConvert.SerializeObject(rawAudioCollectionsData, jsonSettings);
-        File.WriteAllText(filePath, json);
+        File.WriteAllText(audioCollectionsPath, json);
         
         // Parse raw data into list of folders/clips and list of audio collections
         folderClips = rawAudioCollectionsData.ToDictionary(kvp => kvp.Key, 
             _ => new List<ProbabilityAudioClip>());
         audioCollections = new();
             
-        foreach ((string folderName, string[] tableNames) in rawAudioCollectionsData)
+        foreach ((string folderName, List<string> tableNames) in rawAudioCollectionsData)
         {
             foreach (string tableName in tableNames)
             {
