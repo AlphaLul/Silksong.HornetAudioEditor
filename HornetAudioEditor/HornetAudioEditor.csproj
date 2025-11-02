@@ -6,9 +6,9 @@
     -->
     <Import Condition="Exists('../SilksongPath.props')" Project="../SilksongPath.props"/>
     <ItemGroup>
-        <Content Include="$(MSBuildProjectDirectory)/../Included Clips/**/*">
+        <Content Include="$(MSBuildProjectDirectory)/../Included Content/**/*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <Link>Clips/%(RecursiveDir)%(Filename)%(Extension)</Link>
+            <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
         </Content>
     </ItemGroup>
 
@@ -38,11 +38,10 @@
     <Target Name="CopyMod" AfterTargets="PostBuildEvent">
         <ItemGroup>
             <Binaries Include="$(TargetPath)"/>
-            <Clips Include="$(TargetDir)Clips/**/*"/>
         </ItemGroup>
 
         <Copy SourceFiles="@(Binaries)" DestinationFolder="$(SilksongFolder)/BepInEx/plugins/$(TargetName)"/>
-        <Copy SourceFiles="@(Clips)" DestinationFiles="@(Clips->'$(SilksongFolder)/BepInEx/plugins/$(TargetName)/Clips/%(RecursiveDir)%(Filename)%(Extension)')"/>
+        <Copy SourceFiles="@(Content)" DestinationFiles="@(Content->'$(SilksongFolder)/BepInEx/plugins/$(TargetName)/%(RecursiveDir)%(Filename)%(Extension)')"/>
 
         <PropertyGroup>
             <ExportFolder>../Release</ExportFolder>
@@ -51,7 +50,7 @@
         <RemoveDir Directories="$(IntermediateOutputPath)/archive"/>
         <MakeDir Directories="$(ExportFolder)"/>
         <Copy SourceFiles="@(Binaries)" DestinationFolder="$(IntermediateOutputPath)/archive"/>
-        <Copy SourceFiles="@(Clips)" DestinationFiles="@(Clips->'$(IntermediateOutputPath)/archive/Clips/%(RecursiveDir)%(Filename)%(Extension)')"/>
+        <Copy SourceFiles="@(Content)" DestinationFiles="@(Content->'$(IntermediateOutputPath)/archive/%(RecursiveDir)%(Filename)%(Extension)')"/>
         <Copy SourceFiles="@(Binaries)" DestinationFolder="$(ExportFolder)"/>
         <ZipDirectory SourceDirectory="$(IntermediateOutputPath)/archive" DestinationFile="$(ExportFolder)/$(TargetName).zip" Overwrite="True"/>
     </Target>
