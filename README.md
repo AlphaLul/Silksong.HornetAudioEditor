@@ -11,25 +11,28 @@ https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 ## Installation
 1. Install BepInEx 5 for Silksong
 2. Download `HornetAudioEditor.zip` and extract it to the `BepInEx/plugins` folder
-4. Download `AudioTablePatcher.dll` and put it in the `BepInEx/patchers` folder
-5. Run the game
-   - After running the game, you'll have access to the `audioCollections.json` file in the `HornetAudioEditor` folder
+3. Download `AudioTablePatcher.dll` and put it in the `BepInEx/patchers` folder
+4. Run the game
 
 ## Basic Usage
-### Add audio clips
-To add audio clips to the mod, place .wav files in the `Clips` folder or any of its subfolders.  
-Your `HornetAudioEditor` folder should look something like this:
+When fully populated, your `HornetAudioEditor` folder should look something like this:
 <pre>
 HornetAudioEditor/
 ├─ Clips/
 │  ├─ clip1.wav
 │  ├─ clip2.wav
 │  └─ subfolder/
-│     └─ clip3.wav
+│     ├─ clip3.wav
 │     └─ clip4.wav
+├─ Collection Templates/
+│  ├─ template1.json
+│  └─ template2.json
 ├─ audioCollections.json
 └─ HornetAudioEditor.dll
 </pre>
+
+### Add audio clips
+To add audio clips to the mod, place .wav files in the `Clips` folder or any of its subfolders.  
 
 ### Configure `audioCollections.json`
 To tell the game which folders to use for each audio table, edit the `audioCollections.json` file.
@@ -68,8 +71,31 @@ If you want an audio table to keep its original (vanilla) audio alongside the mo
   ]
 }
 ```
+## Collection Templates
+Collection templates are optional .json files stored in the `Collection Templates` folder.
+
+Instead of referencing each table's name individually in `audioCollections.json`, you can simply reference any `template.json` files. Use these to prevent your `audioCollections.json` file from getting overcrowded, or to easily share large collections of tables with others.
+
+#### Example:  
+`template1.json`
+```json
+[
+  "table1",
+  "table2",
+  "etc"
+]
+```
+`audioCollections.json`
+```json
+{
+  "subfolder": [
+    "template1.json",
+    "singletable"
+  ]
+}
+```
 ## BepInEx Config
-A BepInEx config file can be found at `BepInEx/config/alphalul.HornetAudioEditor.cfg`. This file lets you customize some basic settings.
+A BepInEx config file can be found at `BepInEx/config/alphalul.HornetAudioEditor.cfg` after running the game once. This file lets you customize some basic settings.
 
 | Setting | Default | Description  |
 | ------------ | ------------- | ------------- |
