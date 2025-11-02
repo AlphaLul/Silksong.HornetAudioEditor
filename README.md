@@ -13,6 +13,7 @@ https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 2. Download `HornetAudioEditor.zip` and extract it to the `BepInEx/plugins` folder
 3. Download `AudioTablePatcher.dll` and put it in the `BepInEx/patchers` folder
 4. Run the game
+    - After running the game, you'll have access to the `audioCollections.json` file in the `HornetAudioEditor` folder
 
 ## Basic Usage
 When fully populated, your `HornetAudioEditor` folder should look something like this:
@@ -32,12 +33,12 @@ HornetAudioEditor/
 </pre>
 
 ### Add audio clips
-To add audio clips to the mod, place .wav files in the `Clips` folder or any of its subfolders.  
+To add audio clips to the mod, place .wav files in the `Clips` folder or any of its subfolders.
 
 ### Configure `audioCollections.json`
 To tell the game which folders to use for each audio table, edit the `audioCollections.json` file.
 - **Key**: name of folder relative to `Clips`
-  - Use an empty string `""` for the base `Clips` folder
+    - Use an empty string `""` for the base `Clips` folder
 - **Value**: array of names of audio tables that should use the audio from the folder
 
 #### Example:
@@ -60,7 +61,7 @@ To tell the game which folders to use for each audio table, edit the `audioColle
 ## Keeping Vanilla Audio
 If you want an audio table to keep its original (vanilla) audio alongside the modded audio, add a `+` in front of the table name.
 
-#### Example:  
+#### Example:
 - `table1` fully replaces its audio with only the modded audio
 - `table2` adds the modded audio while keeping its vanilla audio
 ```json
@@ -71,13 +72,13 @@ If you want an audio table to keep its original (vanilla) audio alongside the mo
   ]
 }
 ```
-## Collection Templates
-Collection templates are optional .json files stored in the `Collection Templates` folder.
+## Collection Presets
+Collection presets are optional .json files stored in the `Collection Presets` folder. They define preset collections of audio tables that can be referenced in `audioCollections.json` all at once.
 
-Instead of referencing each table's name individually in `audioCollections.json`, you can simply reference any `template.json` files. Use these to prevent your `audioCollections.json` file from getting overcrowded, or to easily share large collections of tables with others.
+Use these to prevent your `audioCollections.json` file from getting overcrowded, or to easily share large collections of tables with others.
 
-#### Example:  
-`template1.json`
+#### Example:
+`preset1.json`
 ```json
 [
   "table1",
@@ -86,10 +87,11 @@ Instead of referencing each table's name individually in `audioCollections.json`
 ]
 ```
 `audioCollections.json`
+- Interpreted the same as `table1`, `table2`, `etc`, `singletable`
 ```json
 {
   "subfolder": [
-    "template1.json",
+    "preset1.json",
     "singletable"
   ]
 }

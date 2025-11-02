@@ -21,7 +21,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private Dictionary<string, AudioCollection> audioCollections;
     private string clipsPath;
     private string audioCollectionsPath;
-    private string collectionTemplatesPath;
+    private string collectionPresetsPath;
 
     private static HornetAudioEditorPlugin Instance { get; set; }
     private Harmony harmony = new(Id);
@@ -54,7 +54,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         
         clipsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Clips");
         audioCollectionsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "audioCollections.json");
-        collectionTemplatesPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Collection Templates");
+        collectionPresetsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Collection Presets");
         Directory.CreateDirectory(clipsPath);
         
         harmony.PatchAll(typeof(GameManagerStart_Patch));
@@ -79,8 +79,8 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         RandomAudioClipTable[] loadedAudioTables = Resources.FindObjectsOfTypeAll<RandomAudioClipTable>();
         foreach (RandomAudioClipTable table in loadedAudioTables)
         {
-            if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) continue;
-            ApplyClips(table, audioCollection);
+            if (audioCollections.TryGetValue(table.name, out AudioCollection audioCollection))
+                ApplyClips(table, audioCollection);
         }
     }
     
@@ -139,9 +139,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private void LoadAudioTable(RandomAudioClipTable table)
     {
         if (audioCollections == null || folderClips == null) return;
-        if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) return;
-        audioCollection.vanillaClips = (ProbabilityAudioClip[])table.clips.Clone();
-        ApplyClips(table, audioCollection);
+        if (audioCollections.TryGetValue(table.name, out AudioCollection audioCollection))
+        {
+            audioCollection.vanillaClips = (ProbabilityAudioClip[])table.clips.Clone();
+            ApplyClips(table, audioCollection);
+        }
     }
     
     private void LogAudio(string message)
@@ -170,7 +172,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         {
             try
             {
-                rawAudioCollectionsData = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(File.ReadAllText(audioCollectionsPath));
+                rawAudioCollectionsData = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(File.ReadAllText(audioCollectionsPath), jsonSettings);
             }
             catch (Exception exception)
             {
@@ -189,30 +191,59 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
                     "Hornet_poshanka"
                 ]
             };
+            
+            string json = JsonConvert.SerializeObject(rawAudioCollectionsData, jsonSettings);
+            File.WriteAllText(audioCollectionsPath, json);
         }
+        
+        ApplyCollectionPresets(rawAudioCollectionsData, jsonSettings);
+        ParseRawAudioCollectionsData(rawAudioCollectionsData);
+        return true;
+    }
+
+    private void ApplyCollectionPresets(Dictionary<string, List<string>> rawAudioCollectionsData, JsonSerializerSettings jsonSettings)
+    {
+        Dictionary<string, string[]> presetCache = new();
         
         foreach (List<string> tablesList in rawAudioCollectionsData.Values)
         {
-            IEnumerable<string> collectionTemplates = tablesList.Where(t => t.EndsWith(".json")).ToList();
-            foreach (string collectionTemplate in collectionTemplates)
+            string[] presets = tablesList.Where(t => t.EndsWith(".json")).ToArray();
+            if (presets.Length == 0) continue;
+
+            foreach (string preset in presets)
             {
                 try
                 {
-                    string[] tables = JsonConvert.DeserializeObject<string[]>(File.ReadAllText(Path.Combine(collectionTemplatesPath, collectionTemplate)));
+                    if (presetCache.TryGetValue(preset, out string[] tables))
+                    {
+                        tablesList.AddRange(tables);
+                        continue;
+                    }
+                    
+                    tables = JsonConvert.DeserializeObject<string[]>(
+                        File.ReadAllText(Path.Combine(collectionPresetsPath, preset.TrimStart('+'))), jsonSettings);
+                    presetCache[preset] = tables;
+                    if (preset.StartsWith('+'))
+                    {
+                        for (int i = 0; i < tables.Length; i++)
+                        {
+                            if (!tables[i].StartsWith('+'))
+                                tables[i] = $"+{tables[i]}";
+                        }
+                    }
                     tablesList.AddRange(tables);
                 }
                 catch (Exception exception)
                 {
                     Debug.LogError($"Hornet Audio Editor: {exception.Message}");
                 }
-                tablesList.Remove(collectionTemplate);
+                tablesList.Remove(preset);
             }
         }
-        
-        string json = JsonConvert.SerializeObject(rawAudioCollectionsData, jsonSettings);
-        File.WriteAllText(audioCollectionsPath, json);
-        
-        // Parse raw data into list of folders/clips and list of audio collections
+    }
+
+    private void ParseRawAudioCollectionsData(Dictionary<string, List<string>> rawAudioCollectionsData)
+    {
         folderClips = rawAudioCollectionsData.ToDictionary(kvp => kvp.Key, 
             _ => new List<ProbabilityAudioClip>());
         audioCollections = new();
@@ -222,21 +253,15 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             foreach (string tableName in tableNames)
             {
                 string trimmedTableName = tableName.TrimStart('+');
-                if (audioCollections.ContainsKey(trimmedTableName))
+                if (audioCollections.TryGetValue(trimmedTableName, out AudioCollection audioCollection))
                 {
-                    AudioCollection entry = audioCollections[trimmedTableName];
-                    entry.folders.Add(folderName);
-                    entry.includeVanillaClips |= tableName.StartsWith('+');
-                    audioCollections[trimmedTableName] = entry;
+                    audioCollection.folders.Add(folderName);
+                    audioCollection.includeVanillaClips |= tableName.StartsWith('+');
+                    continue;
                 }
-                else
-                {
-                    audioCollections[trimmedTableName] = new AudioCollection([folderName], tableName.StartsWith('+'));
-                }
+                audioCollections[trimmedTableName] = new AudioCollection([folderName], tableName.StartsWith('+'));
             }
         }
-
-        return true;
     }
     
     [HarmonyPatch(typeof(RandomAudioClipTable), "OnEnable")]
