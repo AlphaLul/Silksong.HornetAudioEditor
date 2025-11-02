@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
     - After running the game, you'll have access to the `audioCollections.json` file in the `HornetAudioEditor` folder
 
 ## Basic Usage
-When fully populated, your `HornetAudioEditor` folder should look something like this:
+When fully configured, your `HornetAudioEditor` folder should look something like this:
 <pre>
 HornetAudioEditor/
 ├─ Clips/
@@ -25,9 +25,9 @@ HornetAudioEditor/
 │  └─ subfolder/
 │     ├─ clip3.wav
 │     └─ clip4.wav
-├─ Collection Templates/
-│  ├─ template1.json
-│  └─ template2.json
+├─ Collection Presets/
+│  ├─ preset1.json
+│  └─ preset2.json
 ├─ audioCollections.json
 └─ HornetAudioEditor.dll
 </pre>
