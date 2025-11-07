@@ -14,7 +14,7 @@ using ProbabilityAudioClip = RandomAudioClipTable.ProbabilityAudioClip;
 namespace HornetAudioEditor;
 #nullable disable
 
-[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.2.0")]
+[BepInAutoPlugin(id: "alphalul.HornetAudioEditor", name: "Hornet Audio Editor", version: "1.2.1")]
 public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 {
     private Dictionary<string, List<ProbabilityAudioClip>> folderClips;
@@ -22,6 +22,13 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private string clipsPath;
     private string audioCollectionsPath;
     private string collectionPresetsPath;
+    
+    private static JsonSerializerSettings jsonSettings = new()
+    {
+        Formatting = Formatting.Indented,
+        NullValueHandling = NullValueHandling.Ignore,
+        DefaultValueHandling = DefaultValueHandling.Ignore
+    };
 
     private static HornetAudioEditorPlugin Instance { get; set; }
     private Harmony harmony = new(Id);
@@ -38,7 +45,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             "General",
             "Enabled",
             true,
-            "Whether the mod is active. Set to false to disable the mod.");
+            "Whether the mod is active. Set to false to disable modification of audio.");
         configLogAudio = Config.Bind(
             "General",
             "LogAudio",
@@ -48,8 +55,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             "Loading",
             "RefreshOnSaveQuit",
             true,
-            "Whether to re-apply audioCollections.json upon returning to the title screen.");
+            "Whether to reapply audioCollections.json upon returning to the title screen.");
 
+        //Should log audio even if other functionality is disabled
+        if (configLogAudio.Value)
+            harmony.PatchAll(typeof(AudioLog_Patch));
         if (!configModEnabled.Value) return;
         
         clipsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Clips");
@@ -57,15 +67,13 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         collectionPresetsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Collection Presets");
         Directory.CreateDirectory(clipsPath);
         
-        harmony.PatchAll(typeof(GameManagerStart_Patch));
-        if (configRefreshOnSaveQuit.Value)
-            harmony.PatchAll(typeof(AudioTableOnEnable_Patch));
-        if (configLogAudio.Value)
-            harmony.PatchAll(typeof(AudioLog_Patch));
-
         StartCoroutine(RefreshAudioCollectionsRoutine());
+        
+        harmony.PatchAll(typeof(AudioTableOnEnable_Patch));
+        if (configRefreshOnSaveQuit.Value)
+            harmony.PatchAll(typeof(ReturnToMainMenu_Patch));
     }
-
+    
     private IEnumerator RefreshAudioCollectionsRoutine()
     {
         if (!RetrieveAudioCollectionsData())
@@ -74,18 +82,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             yield break;
         }
         
-        yield return LoadClipsRoutine();
-
-        RandomAudioClipTable[] loadedAudioTables = Resources.FindObjectsOfTypeAll<RandomAudioClipTable>();
-        foreach (RandomAudioClipTable table in loadedAudioTables)
-        {
-            if (audioCollections.TryGetValue(table.name, out AudioCollection audioCollection))
-                ApplyClips(table, audioCollection);
-        }
-    }
-    
-    private IEnumerator LoadClipsRoutine()
-    {
+        //Load clips
         foreach (string folder in folderClips.Keys)
         {
             List<AudioClip> streamedFolderClips = new();
@@ -120,9 +117,13 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
 
         clips.Add(streamedClip);
     }
-
-    private void ApplyClips(RandomAudioClipTable table, AudioCollection audioCollection)
+    
+    private void LoadAudioTable(RandomAudioClipTable table)
     {
+        if (audioCollections == null || folderClips == null) return;
+        if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) return;
+        
+        //Apply clips
         List<ProbabilityAudioClip> clipsToApply = new();
         foreach (string folder in audioCollection.folders)
         {
@@ -130,20 +131,9 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         }
         if (clipsToApply.Count != 0) Logger.LogInfo($"Applied mod to {table.name}");
         if (audioCollection.includeVanillaClips || clipsToApply.Count == 0)
-            clipsToApply.AddRange(audioCollection.vanillaClips);
+            clipsToApply.AddRange(table.clips);
         
         table.clips = clipsToApply.ToArray();
-        
-    }
-    
-    private void LoadAudioTable(RandomAudioClipTable table)
-    {
-        if (audioCollections == null || folderClips == null) return;
-        if (audioCollections.TryGetValue(table.name, out AudioCollection audioCollection))
-        {
-            audioCollection.vanillaClips = (ProbabilityAudioClip[])table.clips.Clone();
-            ApplyClips(table, audioCollection);
-        }
     }
     
     private void LogAudio(string message)
@@ -154,19 +144,12 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
     {
         public HashSet<string> folders = folders;
-        public ProbabilityAudioClip[] vanillaClips;
         public bool includeVanillaClips = includeVanillaClips;
     }
 
     private bool RetrieveAudioCollectionsData()
     {
         Dictionary<string, List<string>> rawAudioCollectionsData;
-        JsonSerializerSettings jsonSettings = new()
-        {
-            Formatting = Formatting.Indented,
-            NullValueHandling = NullValueHandling.Ignore,
-            DefaultValueHandling = DefaultValueHandling.Ignore
-        };
         
         if (File.Exists(audioCollectionsPath))
         {
@@ -196,34 +179,32 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             File.WriteAllText(audioCollectionsPath, json);
         }
         
-        ApplyCollectionPresets(rawAudioCollectionsData, jsonSettings);
+        ApplyCollectionPresets(rawAudioCollectionsData);
         ParseRawAudioCollectionsData(rawAudioCollectionsData);
         return true;
     }
 
-    private void ApplyCollectionPresets(Dictionary<string, List<string>> rawAudioCollectionsData, JsonSerializerSettings jsonSettings)
+    private void ApplyCollectionPresets(Dictionary<string, List<string>> rawAudioCollectionsData)
     {
         Dictionary<string, string[]> presetCache = new();
         
         foreach (List<string> tablesList in rawAudioCollectionsData.Values)
         {
-            string[] presets = tablesList.Where(t => t.EndsWith(".json")).ToArray();
-            if (presets.Length == 0) continue;
-
-            foreach (string preset in presets)
+            foreach (string preset in tablesList.Where(t => t.EndsWith(".json")).ToArray())
             {
                 try
                 {
-                    if (presetCache.TryGetValue(preset, out string[] tables))
-                    {
-                        tablesList.AddRange(tables);
-                        continue;
-                    }
+                    bool includeVanillaClips = preset.StartsWith('+');
+                    string presetKey = preset.TrimStart('+');
                     
-                    tables = JsonConvert.DeserializeObject<string[]>(
-                        File.ReadAllText(Path.Combine(collectionPresetsPath, preset.TrimStart('+'))), jsonSettings);
-                    presetCache[preset] = tables;
-                    if (preset.StartsWith('+'))
+                    if (!presetCache.TryGetValue(presetKey, out string[] tables))
+                    {
+                        tables = JsonConvert.DeserializeObject<string[]>(
+                            File.ReadAllText(Path.Combine(collectionPresetsPath, presetKey)), jsonSettings);
+                        presetCache[presetKey] = tables;
+                    }
+
+                    if (includeVanillaClips)
                     {
                         for (int i = 0; i < tables.Length; i++)
                         {
@@ -257,9 +238,9 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
                 {
                     audioCollection.folders.Add(folderName);
                     audioCollection.includeVanillaClips |= tableName.StartsWith('+');
-                    continue;
                 }
-                audioCollections[trimmedTableName] = new AudioCollection([folderName], tableName.StartsWith('+'));
+                else
+                    audioCollections[trimmedTableName] = new AudioCollection([folderName], tableName.StartsWith('+'));
             }
         }
     }
@@ -274,11 +255,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         }
     }
     
-    [HarmonyPatch(typeof(GameManager), nameof(GameManager.Start))]
-    class GameManagerStart_Patch
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.ReturnToMainMenu))]
+    class ReturnToMainMenu_Patch
     {
         [HarmonyPostfix]
-        static void Start_Postfix()
+        static void ReturnToMainMenu_Postfix()
         {
             Instance.StartCoroutine(Instance.RefreshAudioCollectionsRoutine());
         }
