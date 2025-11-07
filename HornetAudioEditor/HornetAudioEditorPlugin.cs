@@ -67,15 +67,16 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         collectionPresetsPath = Path.Combine(Path.GetDirectoryName(Info.Location), "Collection Presets");
         Directory.CreateDirectory(clipsPath);
         
-        StartCoroutine(RefreshAudioCollectionsRoutine());
-        
         harmony.PatchAll(typeof(AudioTableOnEnable_Patch));
         if (configRefreshOnSaveQuit.Value)
-            harmony.PatchAll(typeof(ReturnToMainMenu_Patch));
+            harmony.PatchAll(typeof(Start_Patch));
     }
     
     private IEnumerator RefreshAudioCollectionsRoutine()
     {
+        RandomAudioClipTable[] loadedAudioTables = Resources.FindObjectsOfTypeAll<RandomAudioClipTable>();
+        ResetPersistentTables(loadedAudioTables);
+        
         if (!RetrieveAudioCollectionsData())
         {
             Logger.LogError("Something is wrong with \'audioCollections.json\', unable to initialize HornetAudioEditor mod.");
@@ -87,7 +88,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         {
             List<AudioClip> streamedFolderClips = new();
             string folderPath = Path.Combine(clipsPath, folder);
-            if (!Directory.Exists(folderPath)) yield break;
+            if (!Directory.Exists(folderPath))
+            {
+                Logger.LogWarning($"Folder {folder} doesn't exist");
+                continue;
+            }
             
             string[] collectionWavFiles = Directory.GetFiles(folderPath, "*.wav", SearchOption.TopDirectoryOnly);
             foreach (string wavFile in collectionWavFiles)
@@ -103,8 +108,25 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
                 });
             }
         }
+
+        foreach (RandomAudioClipTable table in loadedAudioTables)
+        {
+            LoadAudioTable(table);
+        }
     }
-    
+
+    private void ResetPersistentTables(RandomAudioClipTable[] loadedAudioTables)
+    {
+        if (audioCollections == null || folderClips == null) return;
+        foreach (RandomAudioClipTable table in loadedAudioTables)
+        {
+            if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) continue;
+            
+            Logger.LogWarning($"{table.name} reset");
+            table.clips = audioCollection.vanillaClips;
+        }
+    }
+
     private IEnumerator WavToAudioClipRoutine(string wavFile, List<AudioClip> clips)
     {
         string uri = new Uri(wavFile).AbsoluteUri;
@@ -123,15 +145,22 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         if (audioCollections == null || folderClips == null) return;
         if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) return;
         
-        //Apply clips
+        audioCollection.vanillaClips = (ProbabilityAudioClip[])table.clips.Clone();
+        
         List<ProbabilityAudioClip> clipsToApply = new();
         foreach (string folder in audioCollection.folders)
         {
             clipsToApply.AddRange(folderClips[folder]);
         }
-        if (clipsToApply.Count != 0) Logger.LogInfo($"Applied mod to {table.name}");
-        if (audioCollection.includeVanillaClips || clipsToApply.Count == 0)
+        if (clipsToApply.Count == 0) return;
+        
+        if (audioCollection.includeVanillaClips)
+        {
+            Logger.LogInfo($"Applied {clipsToApply.Count} modded clips and {table.clips.Length} vanilla clips to {table.name}");
             clipsToApply.AddRange(table.clips);
+        }
+        else
+            Logger.LogInfo($"Applied {clipsToApply.Count} modded clips to {table.name}");
         
         table.clips = clipsToApply.ToArray();
     }
@@ -144,6 +173,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
     {
         public HashSet<string> folders = folders;
+        public ProbabilityAudioClip[] vanillaClips;
         public bool includeVanillaClips = includeVanillaClips;
     }
 
@@ -255,11 +285,11 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         }
     }
     
-    [HarmonyPatch(typeof(GameManager), nameof(GameManager.ReturnToMainMenu))]
-    class ReturnToMainMenu_Patch
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.Start))]
+    class Start_Patch
     {
         [HarmonyPostfix]
-        static void ReturnToMainMenu_Postfix()
+        static void Start_Postfix()
         {
             Instance.StartCoroutine(Instance.RefreshAudioCollectionsRoutine());
         }
