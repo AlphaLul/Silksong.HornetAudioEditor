@@ -27,7 +27,7 @@ namespace HornetAudioEditor.Patcher
             type.Methods.Add(onEnable);
             
             if (type.Methods.Any(m => m.Name == "OnEnable"))
-                Console.WriteLine("Injected OnEnable into RandomAudioClipTable.");
+                Console.WriteLine("AudioTablePatcher: Injected OnEnable into RandomAudioClipTable.");
         }
     }
 }
