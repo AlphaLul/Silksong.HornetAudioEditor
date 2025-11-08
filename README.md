@@ -99,11 +99,12 @@ Use these to prevent your `audioCollections.json` file from getting overcrowded,
 ## BepInEx Config
 A BepInEx config file can be found at `BepInEx/config/alphalul.HornetAudioEditor.cfg` after running the game once. This file lets you customize some basic settings.
 
-| Setting | Default | Description  |
-| ------------ | ------------- | ------------- |
-| Enabled | true | Whether the mod is active. Set to false to disable modification of audio. |
-| LogAudio | false | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
-| RefreshOnSaveQuit | true | Whether to reapply `audioCollections.json` upon returning to the title screen. |
+| Setting           | Default | Description                                                                                                |
+|-------------------|---------|------------------------------------------------------------------------------------------------------------|
+| Enabled           | true    | Whether the mod is active. Set to false to disable modification of audio.                                  |
+| RefreshOnSaveQuit | true    | Whether to reapply `audioCollections.json` upon returning to the title screen.                             |
+| LogAudio          | false   | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
+| LogSpamCooldown   | 0.2     | How many seconds to wait until logging the same `RandomAudioClipTable` again. Helps reduce console spam.   |
 
 ### ⚠️ Finding audio table names
 To use `LogAudio` properly, you need to enable the BepInEx console to read the logs in real time. To do so:
