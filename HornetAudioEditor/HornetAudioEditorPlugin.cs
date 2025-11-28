@@ -58,7 +58,7 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         configLogAudio = Config.Bind(
             "Logging",
             "LogAudio",
-            false,
+            true,
             "Whether to log the name of a RandomAudioClipTable when it plays a sound. Useful for finding table names.");
         configLogSpamCooldown = Config.Bind(
             "Logging",
