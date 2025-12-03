@@ -107,7 +107,7 @@ A BepInEx config file can be found at `BepInEx/config/alphalul.HornetAudioEditor
 |-------------------|---------|------------------------------------------------------------------------------------------------------------|
 | Enabled           | true    | Whether the mod is active. Set to false to disable modification of audio.                                  |
 | RefreshOnSaveQuit | true    | Whether to reapply `audioCollections.json` upon returning to the title screen.                             |
-| LogAudio          | false   | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
+| LogAudio          | true    | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
 | LogSpamCooldown   | 0.2     | How many seconds to wait until logging the same `RandomAudioClipTable` again. Helps reduce console spam.   |
 
 ### ⚠️ Finding audio table names
