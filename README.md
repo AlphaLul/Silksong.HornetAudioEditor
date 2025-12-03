@@ -1,6 +1,10 @@
 A Silksong mod that enables users to customize the game's audio with their own .wav audio clips. The mod comes prepackaged with some of Hornet's voice lines from the original Hollow Knight game (including shaw).
-<br><br>
 
+## Video Guide
+### [Watch on YouTube](https://www.youtube.com/embed/YPCi3jd9szw)
+[![Watch the video](https://img.youtube.com/vi/YPCi3jd9szw/hqdefault.jpg)](https://www.youtube.com/embed/YPCi3jd9szw)
+
+### Demo
 https://github.com/user-attachments/assets/ae088c99-802a-4f5f-a979-8ae69b537a24
 
 # Guide
@@ -99,11 +103,12 @@ Use these to prevent your `audioCollections.json` file from getting overcrowded,
 ## BepInEx Config
 A BepInEx config file can be found at `BepInEx/config/alphalul.HornetAudioEditor.cfg` after running the game once. This file lets you customize some basic settings.
 
-| Setting | Default | Description  |
-| ------------ | ------------- | ------------- |
-| Enabled | true | Whether the mod is active. Set to false to disable modification of audio. |
-| LogAudio | false | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
-| RefreshOnSaveQuit | true | Whether to reapply `audioCollections.json` upon returning to the title screen. |
+| Setting           | Default | Description                                                                                                |
+|-------------------|---------|------------------------------------------------------------------------------------------------------------|
+| Enabled           | true    | Whether the mod is active. Set to false to disable modification of audio.                                  |
+| RefreshOnSaveQuit | true    | Whether to reapply `audioCollections.json` upon returning to the title screen.                             |
+| LogAudio          | false   | Whether to log the name of a `RandomAudioClipTable` when it plays a sound. Useful for finding table names. |
+| LogSpamCooldown   | 0.2     | How many seconds to wait until logging the same `RandomAudioClipTable` again. Helps reduce console spam.   |
 
 ### ⚠️ Finding audio table names
 To use `LogAudio` properly, you need to enable the BepInEx console to read the logs in real time. To do so:

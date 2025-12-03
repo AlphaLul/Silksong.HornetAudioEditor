@@ -34,8 +34,12 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
     private Harmony harmony = new(Id);
     
     private ConfigEntry<bool> configModEnabled;
-    private ConfigEntry<bool> configLogAudio;
     private ConfigEntry<bool> configRefreshOnSaveQuit;
+    private ConfigEntry<bool> configLogAudio;
+    private ConfigEntry<float> configLogSpamCooldown;
+
+    private HashSet<string> recentLogs = new();
+    private Queue<(string log, float time)> logBufferQueue = new();
     
     private void Awake()
     {
@@ -46,16 +50,22 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             "Enabled",
             true,
             "Whether the mod is active. Set to false to disable modification of audio.");
-        configLogAudio = Config.Bind(
-            "General",
-            "LogAudio",
-            false,
-            "Whether to log the name of a RandomAudioClipTable when it plays a sound. Useful for finding table names.");
         configRefreshOnSaveQuit = Config.Bind(
-            "Loading",
+            "General",
             "RefreshOnSaveQuit",
             true,
             "Whether to reapply audioCollections.json upon returning to the title screen.");
+        configLogAudio = Config.Bind(
+            "Logging",
+            "LogAudio",
+            true,
+            "Whether to log the name of a RandomAudioClipTable when it plays a sound. Useful for finding table names.");
+        configLogSpamCooldown = Config.Bind(
+            "Logging",
+            "LogSpamCooldown",
+            0.2f,
+            "How many seconds to wait until logging the same RandomAudioClipTable again. Helps reduce console spam.");
+       
 
         //Should log audio even if other functionality is disabled
         if (configLogAudio.Value)
@@ -121,8 +131,6 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         foreach (RandomAudioClipTable table in loadedAudioTables)
         {
             if (!audioCollections.TryGetValue(table.name, out AudioCollection audioCollection)) continue;
-            
-            Logger.LogWarning($"{table.name} reset");
             table.clips = audioCollection.vanillaClips;
         }
     }
@@ -156,18 +164,13 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
         
         if (audioCollection.includeVanillaClips)
         {
-            Logger.LogInfo($"Applied {clipsToApply.Count} modded clips and {table.clips.Length} vanilla clips to {table.name}");
+            Logger.LogInfo($"Applied {clipsToApply.Count} modded clip(s) and {table.clips.Length} vanilla clip(s) to {table.name}");
             clipsToApply.AddRange(table.clips);
         }
         else
-            Logger.LogInfo($"Applied {clipsToApply.Count} modded clips to {table.name}");
+            Logger.LogInfo($"Applied {clipsToApply.Count} modded clip(s) to {table.name}");
         
         table.clips = clipsToApply.ToArray();
-    }
-    
-    private void LogAudio(string message)
-    {
-        Logger.LogInfo(message);
     }
 
     private class AudioCollection(HashSet<string> folders, bool includeVanillaClips)
@@ -274,6 +277,24 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             }
         }
     }
+
+    private void Update()
+    {
+        while (logBufferQueue.Count > 0 && Time.unscaledTime - logBufferQueue.Peek().time > configLogSpamCooldown.Value)
+        {
+            recentLogs.Remove(logBufferQueue.Dequeue().log);
+        }
+    }
+
+    private void TryLogAudio(string log)
+    {
+        if (recentLogs.Contains(log)) return;
+        
+        Logger.LogInfo(log);
+        
+        recentLogs.Add(log);
+        logBufferQueue.Enqueue((log, Time.unscaledTime));
+    }
     
     [HarmonyPatch(typeof(RandomAudioClipTable), "OnEnable")]
     class AudioTableOnEnable_Patch
@@ -294,14 +315,15 @@ public partial class HornetAudioEditorPlugin : BaseUnityPlugin
             Instance.StartCoroutine(Instance.RefreshAudioCollectionsRoutine());
         }
     }
-
-    [HarmonyPatch(typeof(RandomAudioClipTable), nameof(RandomAudioClipTable.SelectRandomClip))]
+    
+    [HarmonyPatch(typeof(RandomAudioClipTable), nameof(RandomAudioClipTable.CanPlay))]
     class AudioLog_Patch
     {
-        [HarmonyPrefix]
-        static void SelectRandomClip_Prefix(RandomAudioClipTable __instance)
+        [HarmonyPostfix]
+        static void PlayAudio_Postfix(RandomAudioClipTable __instance, bool __result)
         {
-            Instance.LogAudio(__instance.name);
+            if (!__result) return;
+            Instance.TryLogAudio(__instance.name);
         }
     }
 }
